@@ -1,0 +1,7 @@
+include MANIFEST.in
+include README.md setup.py LICENSE
+
+global-exclude *.py[cod]
+
+recursive-include mcfun *.dat
+
