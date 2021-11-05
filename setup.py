@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 
 NAME            = 'MCfun'
 MAINTAINERS     = 'Zhishen Pu'
-AUTHOR          = 'Yunlong Xiao'
+AUTHOR          = 'Zhishen Pu, Yunlong Xiao'
 DESCRIPTION     = 'A library to calculate multi-collinear functionl'
 URL             = 'https://arxiv.org/abs/2110.09897'
 
@@ -23,9 +23,9 @@ setup(
     description=DESCRIPTION,
     url=URL,
     #include *.so *.dat files. They are now placed in MANIFEST.in
-    #package_data={'': ['*.so', '*.dylib', '*.dll', '*.dat']},
+    package_data={'': ['*.so', '*.dylib', '*.dll', '*.dat', '*.npy']},
     include_package_data=True,  # include everything in source control
     packages=find_packages(exclude=['*test*', '*examples*']),
-    install_requires=['numpy'],
-    extras_require=EXTRAS,
+    install_requires=['numpy', 'typing', 'nptyping'],
+    #extras_require=EXTRAS,
 )

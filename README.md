@@ -16,3 +16,6 @@ How to cite
 [How to use collinear functionals for non-collinear spins](https://arxiv.org/abs/2110.09897),
 Zhichen Pu, Ning Zhang, Hao Li, Sihong Shao, Hong Jiang, Yiqin Gao, Yunlong Xiao,
 *arXiv:2110.09897*
+
+
+
