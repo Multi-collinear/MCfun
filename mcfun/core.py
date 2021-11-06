@@ -161,8 +161,9 @@ def eval_mcol(rho: NDArray[(typing.Any, typing.Any), numpy.float],
         # We also provide many different grids ranging from Lebedev, Legendre to Fibonacci grids.
         # 5810 is very very enough to calculate nearly all the systems, so we chose it here.
         # If you want to lower the time or do some tests, you can change the provided grids here.
-        NX = NXlib[5810]
-        WX = WXlib[5810]
+        NSgrid_default = 5810
+        NX = NXlib[NSgrid_default]
+        WX = WXlib[NSgrid_default]
     elif callable(spin_grid):
         NX, WX = spin_grid()
     elif type(spin_grid) is tuple:
@@ -220,8 +221,8 @@ def eval_mcol(rho: NDArray[(typing.Any, typing.Any), numpy.float],
     pool.close()
     pool.join()
     # ~ get the final result
-    for result_para in para_results:
-        result = result_para.get()
+    for result_unpack in para_results:
+        result = result_unpack.get()
         if deriv >= 0:
             exc += result[0]
         if deriv >= 1:

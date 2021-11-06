@@ -15,19 +15,6 @@ import os
 
 path = os.path.abspath(os.path.dirname(__file__))
 
-# N50     = numpy.load(path+'/D50.npy')
-# N100    = numpy.load(path+'/D100.npy')
-# N500    = numpy.load(path+'/D500.npy')
-# N1000   = numpy.load(path+'/D1000.npy')
-# N1800   = numpy.load(path+'/DL1800.npy')
-# N4999   = numpy.load(path+'/DL5000.npy')
-# N5000   = numpy.load(path+'/D5000.npy')
-# N10000  = numpy.load(path+'/D10000.npy')
-# N12800  = numpy.load(path+'/D12800.npy')
-# N50000  = numpy.load(path+'/D50000.npy')
-# N100000 = numpy.load(path+'/D100000.npy')
-# N500000 = numpy.load(path+'/D500000.npy')
-# N1000000= numpy.load(path+'/D1000000.npy')
 
 # ~ Lebedev grid
 N14   = numpy.load(path+'/D14.npy')
@@ -56,7 +43,6 @@ N20   = numpy.load(path+'/D20.npy')
 N50   = numpy.load(path+'/D50.npy')
 N100   = numpy.load(path+'/D100.npy')
 N200   = numpy.load(path+'/D200.npy')
-N450   = numpy.load(path+'/D450.npy')
 N800   = numpy.load(path+'/D800.npy')
 N1800   = numpy.load(path+'/D1800.npy')
 N5000   = numpy.load(path+'/D5000.npy')
@@ -66,7 +52,6 @@ W20   = numpy.load(path+'/W20.npy')/numpy.pi*0.25
 W50   = numpy.load(path+'/W50.npy')/numpy.pi*0.25
 W100   = numpy.load(path+'/W100.npy')/numpy.pi*0.25
 W200   = numpy.load(path+'/W200.npy')/numpy.pi*0.25
-W450   = numpy.load(path+'/W450.npy')/numpy.pi*0.25
 W800   = numpy.load(path+'/W800.npy')/numpy.pi*0.25
 W1800   = numpy.load(path+'/W1800.npy')/numpy.pi*0.25
 W5000   = numpy.load(path+'/W5000.npy')/numpy.pi*0.25
@@ -153,7 +138,6 @@ WX = {
     50    : W50   ,
     100   : W100  ,
     200   : W200  ,
-    450   : W450  ,
     800   : W800  ,
     1800  : W1800 ,
     5000  : W5000 ,

@@ -69,7 +69,7 @@ def eval_xc_LDA_energy(rho, m, NX, WX, para, eval_col):
     exc_cpu = 0.0
     
     for idrct in range(init,finish):
-        s = 0.5*(m[0]*NX[idrct,0]
+        s = (m[0]*NX[idrct,0]
                + m[1]*NX[idrct,1]
                + m[2]*NX[idrct,2])
         exct, vxct = eval_col(rho, s)
@@ -112,7 +112,7 @@ def eval_xc_LDA_potential(rho, m, NX, WX, para, eval_col):
     vs_cpu = numpy.zeros((3, Ngrid))
     
     for idrct in range(init,finish):
-        s = 0.5*(m[0]*NX[idrct,0]
+        s = (m[0]*NX[idrct,0]
                + m[1]*NX[idrct,1]
                + m[2]*NX[idrct,2])
         exct, vxct, kxct = eval_col(rho, s)
@@ -203,7 +203,7 @@ def eval_xc_GGA_energy(rho, m, NX, WX, para, eval_col):
     exc_cpu = 0.0
     
     for idrct in range(init,finish):
-        s = 0.5*(m[0]*NX[idrct,0]
+        s = (m[0]*NX[idrct,0]
                + m[1]*NX[idrct,1]
                + m[2]*NX[idrct,2])
         exct, vxct = eval_col(rho, s)
@@ -246,7 +246,7 @@ def eval_xc_GGA_potential(rho, m, NX, WX, para, eval_col):
     vs_cpu = numpy.zeros((3, 4, Ngrid))
     
     for idrct in range(init,finish):
-        s = 0.5*(m[0]*NX[idrct,0]
+        s = (m[0]*NX[idrct,0]
                + m[1]*NX[idrct,1]
                + m[2]*NX[idrct,2])
         exct, vxct, kxct = eval_col(rho, s)
