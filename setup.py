@@ -2,10 +2,10 @@ import os
 from setuptools import setup, find_packages
 
 NAME            = 'MCfun'
-MAINTAINERS     = 'Zhishen Pu'
-AUTHOR          = 'Zhishen Pu, Yunlong Xiao'
+MAINTAINERS     = 'Zhichen Pu(hoshishin), Hao Li(Haskiy)'
+AUTHOR          = 'Yunlong Xiao, Zhichen Pu(hoshishin), Hao Li(Haskiy)'
 DESCRIPTION     = 'A library to calculate multi-collinear functionl'
-URL             = 'https://arxiv.org/abs/2110.09897'
+URL             = 'https://github.com/Multi-collinear/MCfun'
 
 def get_version():
     topdir = os.path.abspath(os.path.join(__file__, '..'))
