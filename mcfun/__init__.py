@@ -8,7 +8,6 @@ FilePath: \MCfun\mcfun\__init__.py
 
   Multi-collinear approach
 '''
-__version__ = '0.1.2'
+__version__ = '0.2.0'
 
-from .core import eval_mcol
-from . import lib, xcutils
+from .eval_xc import eval_xc_eff, eval_xc_collinear_spin
