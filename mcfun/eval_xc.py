@@ -143,12 +143,14 @@ def eval_xc_collinear_spin(func, rho_tm, deriv, spin_samples):
         nvar = rho_tm.shape[1]
 
     rho_ts = _project_spin_paxis(rho_tm)
-    m = rho_tm[1:].reshape(3, nvar, ngrids)
-    s = rho_ts[1]
 
     # TODO: filter s, nabla(s) ~= 0
-    omega[s==0] = 0
-    omega[s!=0] = m[s!=0]/s[s!=0]
+    m = rho_tm[1:].reshape(3, nvar, ngrids)
+    s = rho_ts[1].reshape(nvar, ngrids)[0]
+    with np.errstate(divide='ignore', invalid='ignore'):
+        omega = m[:,0] / s
+    omega[:,s==0] = 0
+
     xc_orig = func(rho_ts, deriv)
     exc_eff = xc_orig[0]
 
