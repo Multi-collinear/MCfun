@@ -220,6 +220,7 @@ def _eval_xc_lebedev(func, rho_tm, deriv, spin_samples,
         rho_pure = rho[0].reshape(nvar,ngrids,nsg)[0]
         exc[rho_pure == 0] = 0
         exc[rho_pure != 0] /= rho_pure[rho_pure != 0]
+        exc += np.einsum('xgo,xgo->go', vxc[1], s)
         exc_eff += np.einsum('go,o->g', exc, p_weights)
 
         if deriv > 0:
