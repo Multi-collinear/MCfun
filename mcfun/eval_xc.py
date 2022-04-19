@@ -147,7 +147,8 @@ def eval_xc_collinear_spin(func, rho_tm, deriv, spin_samples):
     s = rho_ts[1]
 
     # TODO: filter s, nabla(s) ~= 0
-    omega = m / (s + 1e-200)
+    omega[s==0] = 0
+    omega[s!=0] = m[s!=0]/s[s!=0]
     xc_orig = func(rho_ts, deriv)
     exc_eff = xc_orig[0]
 
@@ -197,7 +198,7 @@ def _eval_xc_lebedev(func, rho_tm, deriv, spin_samples,
     '''
     ngrids = rho_tm[0].shape[-1]
     sgrids, weights = _make_sph_samples(spin_samples)
-    blksize = int(np.ceil(1e5 / ngrids)) * 8
+    blksize = int(np.ceil(5e4 / ngrids)) * 8
 
     if rho_tm.ndim == 2:
         nvar = 1
@@ -212,11 +213,13 @@ def _eval_xc_lebedev(func, rho_tm, deriv, spin_samples,
         rho = _project_spin_sph(rho_tm, p_sgrids)
         xc_orig = func(rho, deriv+1)
 
-        exc = xc_orig[0].reshape(ngrids, nsg)/rho[0].reshape(nvar,ngrids,nsg)[0]
+        exc = xc_orig[0].reshape(ngrids, nsg)
         vxc = xc_orig[1].reshape(2, nvar, ngrids, nsg)
 
         s = rho[1].reshape(nvar,ngrids,nsg)
-        exc += np.einsum('xgo,xgo->go', vxc[1], s)
+        rho_pure = rho[0].reshape(nvar,ngrids,nsg)[0]
+        exc[rho_pure == 0] = 0
+        exc[rho_pure != 0] /= rho_pure[rho_pure != 0]
         exc_eff += np.einsum('go,o->g', exc, p_weights)
 
         if deriv > 0:
