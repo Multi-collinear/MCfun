@@ -216,12 +216,11 @@ def _eval_xc_lebedev(func, rho_tm, deriv, spin_samples,
         exc = xc_orig[0].reshape(ngrids, nsg)
         vxc = xc_orig[1].reshape(2, nvar, ngrids, nsg)
 
-        s = rho[1].reshape(nvar,ngrids,nsg)
-        rho_pure = rho[0].reshape(nvar,ngrids,nsg)[0]
-        exc[rho_pure == 0] = 0
-        exc[rho_pure != 0] /= rho_pure[rho_pure != 0]
-        exc += np.einsum('xgo,xgo->go', vxc[1], s)
-        exc_eff += np.einsum('go,o->g', exc, p_weights)
+        rho = rho.reshape(2, nvar, ngrids, nsg)
+        s = rho[1]
+        rho_pure = rho[0,0]
+        exc_rho = exc * rho_pure + np.einsum('xgo,xgo->go', vxc[1], s)
+        exc_eff += np.einsum('go,o->g', exc_rho, p_weights)
 
         if deriv > 0:
             fxc = xc_orig[2].reshape(2, nvar, 2, nvar, ngrids, nsg)
@@ -240,6 +239,12 @@ def _eval_xc_lebedev(func, rho_tm, deriv, spin_samples,
             fxc += np.einsum('xbyczgo,xgo->byczgo', kxc[1], s)
             fxc = np.einsum('rao,axbygo->rxbygo', c_tm, fxc)
             fxc_eff += np.einsum('sbo,rxbygo->rxsyg', cw_tm, fxc)
+
+    # exc in libxc is defined as Exc per particle. exc_eff calculated above is exc*rho.
+    # Divide exc_eff by rho so as to follow the convention of libxc
+    rho_pure = rho_tm[0][0]
+    exc_eff[rho_pure == 0] = 0
+    exc_eff[rho_pure != 0] /= rho_pure[rho_pure != 0]
 
     # Strongly spin-polarized points (rho ~= |m|) can be considered as collinear spins
     if collinear_threshold is not None:
