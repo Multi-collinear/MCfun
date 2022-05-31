@@ -10,6 +10,8 @@ from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 import numpy as np
 from .LebedevGrid import MakeAngularGrid
 
+MAX_GRIDS_PER_TASK = 200
+
 def eval_xc_eff(func, rho_tm, deriv=1, spin_samples=770,
                 collinear_threshold=None, collinear_samples=200, workers=1):
     '''Multi-collinear effective potential and effective kernel.
@@ -82,7 +84,8 @@ def eval_xc_eff(func, rho_tm, deriv=1, spin_samples=770,
         ngrids = rho_tm[0].shape[-1]
         with executor(max_workers=workers) as ex:
             futures = []
-            for p0, p1 in _prange(0, ngrids, ngrids//workers+1):
+            grids_per_task = min(ngrids//(workers*3)+1, MAX_GRIDS_PER_TASK)
+            for p0, p1 in _prange(0, ngrids, grids_per_task):
                 futures.append(ex.submit(_eval_xc_lebedev, func,
                                          rho_tm[...,p0:p1], deriv, spin_samples))
             results = [f.result() for f in futures]
@@ -198,9 +201,9 @@ def _eval_xc_lebedev(func, rho_tm, deriv, spin_samples,
     '''Multi-collinear effective potential and effective kernel with projection
     samples on spherical surface (the Lebedev grid samples)
     '''
-    ngrids = rho_tm[0].shape[-1]
+    ngrids = rho_tm.shape[-1]
     sgrids, weights = _make_sph_samples(spin_samples)
-    blksize = int(np.ceil(5e4 / ngrids)) * 8
+    blksize = int(np.ceil(1e4 / ngrids)) * 8
 
     if rho_tm.ndim == 2:
         nvar = 1
@@ -244,7 +247,10 @@ def _eval_xc_lebedev(func, rho_tm, deriv, spin_samples,
 
     # exc in libxc is defined as Exc per particle. exc_eff calculated above is exc*rho.
     # Divide exc_eff by rho so as to follow the convention of libxc
-    rho_pure = rho_tm[0][0]
+    if rho_tm.ndim == 2:
+        rho_pure = rho_tm[0]
+    else:
+        rho_pure = rho_tm[0,0]
     exc_eff[rho_pure == 0] = 0
     exc_eff[rho_pure != 0] /= rho_pure[rho_pure != 0]
 
