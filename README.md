@@ -13,9 +13,9 @@ Installation
 
 How to cite
 -----------
-[How to use collinear functionals for non-collinear spins](https://arxiv.org/abs/2110.09897),
-Zhichen Pu, Ning Zhang, Hao Li, Sihong Shao, Hong Jiang, Yiqin Gao, Yunlong Xiao,
-*arXiv:2110.09897*
+[Noncollinear density functional theory]([https://arxiv.org/abs/2110.09897](https://journals.aps.org/prresearch/abstract/10.1103/PhysRevResearch.5.013036)),
+Zhichen Pu, Hao Li, Ning Zhang, Hong Jiang, Yiqin Gao, Yunlong Xiao, Qiming Sun, Yong Zhang, and Sihong Shao,
+*Phys. Rev. Research 5, 013036*
 
 
 
