@@ -1,0 +1,24 @@
+name: Release
+
+on:
+  release:
+    types:
+      - released
+  workflow_dispatch:
+
+jobs:
+  release-to-pypi:
+    name: Release on PyPI server
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build wheels
+        uses: pypa/cibuildwheel@v2.16.0
+        with:
+          output-dir: wheelhouse
+      - name: Upload to PyPI
+        run: |
+            pip install twine
+            export TWINE_USERNAME=__token__
+            export TWINE_PASSWORD="${{ secrets.PYPI_API_TOKEN }}"
+            twine upload --verbose /wheelhouse/*
