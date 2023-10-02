@@ -67,12 +67,18 @@ def eval_xc_eff(func, rho_tm, deriv=1, spin_samples=770,
     * [exc, vxc, fxc] if deriv = 2
     '''
     assert deriv < 3
+    rho_tm = np.asarray(rho_tm)
     if rho_tm.dtype != np.double:
         raise RuntimeError('rho and m must be real')
 
+    ngrids = rho_tm.shape[-1]
+    grids_per_task = min(ngrids//(workers*3)+1, MAX_GRIDS_PER_TASK)
     if workers == 1:
-        return _eval_xc_lebedev(func, rho_tm, deriv, spin_samples,
-                                collinear_threshold, collinear_samples)
+        results = []
+        for p0, p1 in _prange(0, ngrids, grids_per_task):
+            r = _eval_xc_lebedev(func, rho_tm[...,p0:p1], deriv, spin_samples,
+                                 collinear_threshold, collinear_samples)
+            results.append(r)
     else:
         if getattr(func, '__closure__', None):
             warnings.warn(f'Closure {func} cannot be parallelized by multiprocessing module. '
@@ -81,15 +87,14 @@ def eval_xc_eff(func, rho_tm, deriv=1, spin_samples=770,
         else:
             executor = ProcessPoolExecutor
 
-        ngrids = rho_tm[0].shape[-1]
         with executor(max_workers=workers) as ex:
             futures = []
-            grids_per_task = min(ngrids//(workers*3)+1, MAX_GRIDS_PER_TASK)
             for p0, p1 in _prange(0, ngrids, grids_per_task):
-                futures.append(ex.submit(_eval_xc_lebedev, func,
-                                         rho_tm[...,p0:p1], deriv, spin_samples))
+                f = ex.submit(_eval_xc_lebedev, func, rho_tm[...,p0:p1], deriv,
+                              spin_samples, collinear_threshold, collinear_samples)
+                futures.append(f)
             results = [f.result() for f in futures]
-        return [None if x[0] is None else np.concatenate(x, axis=-1) for x in zip(*results)]
+    return [None if x[0] is None else np.concatenate(x, axis=-1) for x in zip(*results)]
 
 def eval_xc_collinear_spin(func, rho_tm, deriv, spin_samples):
     '''Multi-collinear functional derivatives for collinear spins
@@ -135,7 +140,7 @@ def eval_xc_collinear_spin(func, rho_tm, deriv, spin_samples):
     * [exc, vxc] if deriv = 1
     * [exc, vxc, fxc] if deriv = 2
     '''
-    ngrids = rho_tm[0].shape[-1]
+    ngrids = rho_tm.shape[-1]
     # samples on z=cos(theta) and their weights between [0, 1]
     sgridz, weights = _make_paxis_samples(spin_samples)
     blksize = int(np.ceil(1e5 / ngrids)) * 8
