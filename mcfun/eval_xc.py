@@ -251,6 +251,7 @@ def _eval_xc_lebedev(func, rho_tm, deriv, spin_samples,
         rho_pure = rho_tm[0]
     else:
         rho_pure = rho_tm[0,0]
+
     exc_eff[rho_pure == 0] = 0
     exc_eff[rho_pure != 0] /= rho_pure[rho_pure != 0]
 
