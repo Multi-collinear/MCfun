@@ -12,13 +12,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Build wheels
-        uses: pypa/cibuildwheel@v2.16.0
-        with:
-          output-dir: wheelhouse
+      - name: Build dist
+        run: |
+            python3 setup.py sdist
       - name: Upload to PyPI
         run: |
-            pip install twine
+            pip3 install twine
             export TWINE_USERNAME=__token__
             export TWINE_PASSWORD="${{ secrets.PYPI_API_TOKEN }}"
-            twine upload --verbose /wheelhouse/*
+            twine upload --verbose dist/*
