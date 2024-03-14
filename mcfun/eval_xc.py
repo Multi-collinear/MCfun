@@ -66,11 +66,11 @@ def eval_xc_eff(func, rho_tm, deriv=1, spin_samples=770,
     * [exc, vxc] if deriv = 1
     * [exc, vxc, fxc] if deriv = 2
     '''
-    assert deriv < 3
+
+    assert deriv < 5
     rho_tm = np.asarray(rho_tm)
     if rho_tm.dtype != np.double:
         raise RuntimeError('rho and m must be real')
-
     ngrids = rho_tm.shape[-1]
     grids_per_task = min(ngrids//(workers*3)+1, MAX_GRIDS_PER_TASK)
     if workers == 1:
@@ -86,7 +86,6 @@ def eval_xc_eff(func, rho_tm, deriv=1, spin_samples=770,
             executor = ThreadPoolExecutor
         else:
             executor = ProcessPoolExecutor
-
         with executor(max_workers=workers) as ex:
             futures = []
             for p0, p1 in _prange(0, ngrids, grids_per_task):
@@ -94,7 +93,58 @@ def eval_xc_eff(func, rho_tm, deriv=1, spin_samples=770,
                               spin_samples, collinear_threshold, collinear_samples)
                 futures.append(f)
             results = [f.result() for f in futures]
+        
     return [None if x[0] is None else np.concatenate(x, axis=-1) for x in zip(*results)]
+
+
+def eval_xc_eff_sf(func, rho_tmz, deriv=1, collinear_samples=200, workers=1):
+    assert deriv < 5
+    if rho_tmz.dtype != np.double:
+        raise RuntimeError('rho and mz must be real')
+    ngrids = rho_tmz.shape[-1]
+    grids_per_task = min(ngrids//(workers*3)+1, MAX_GRIDS_PER_TASK)
+
+    if workers == 1:
+        results = []
+        for p0, p1 in _prange(0, ngrids, grids_per_task):
+            r = _eval_xc_sf(func, rho_tmz[...,p0:p1], deriv, collinear_samples)
+            results.append(r)
+    else:
+        print(collinear_samples)
+        if getattr(func, '__closure__', None):
+            warnings.warn(f'Closure {func} cannot be parallelized by multiprocessing module. '
+                          'It is recommended to generate the function with functools.partial.')
+            executor = ThreadPoolExecutor
+        else:
+            executor = ProcessPoolExecutor
+        with executor(max_workers=workers) as ex:
+            futures = []
+            for p0, p1 in _prange(0, ngrids, grids_per_task):
+                f = ex.submit(_eval_xc_sf, func, rho_tmz[...,p0:p1], deriv, collinear_samples)
+                futures.append(f)
+            results = [f.result() for f in futures]
+        
+    return [None if x[0] is None else np.concatenate(x, axis=-1) for x in zip(*results)]
+
+def _eval_xc_sf(func, rho_tmz, deriv, collinear_samples):
+    ngrids = rho_tmz.shape[-1]
+    # samples on z=cos(theta) and their weights between [0, 1]
+    sgridz, weights = _make_paxis_samples(collinear_samples)
+    blksize = int(np.ceil(1e5 / ngrids)) * 8
+
+    if rho_tmz.ndim == 2:
+        nvar = 1
+    else:
+        nvar = rho_tmz.shape[1]
+    # spin-flip part
+    fxc_sf = 0.0
+    for p0, p1 in _prange(0, weights.size, blksize):
+        rho = _project_spin_paxis2(rho_tmz, sgridz[p0:p1])
+        fxc = func(rho, deriv)[2]
+        fxc = fxc.reshape(2, nvar, 2, nvar, ngrids, p1 - p0)
+        fxc_sf += fxc[1,:,1].dot(weights[p0:p1])
+
+    return None,None,fxc_sf
 
 def eval_xc_collinear_spin(func, rho_tm, deriv, spin_samples):
     '''Multi-collinear functional derivatives for collinear spins
@@ -158,7 +208,7 @@ def eval_xc_collinear_spin(func, rho_tm, deriv, spin_samples):
     with np.errstate(divide='ignore', invalid='ignore'):
         omega = m[:,0] / s
     omega[:,s==0] = 0
-
+    
     xc_orig = func(rho_ts, deriv)
     exc_eff = xc_orig[0]
 
@@ -209,18 +259,19 @@ def _eval_xc_lebedev(func, rho_tm, deriv, spin_samples,
     ngrids = rho_tm.shape[-1]
     sgrids, weights = _make_sph_samples(spin_samples)
     blksize = int(np.ceil(1e4 / ngrids)) * 8
-
+    # import pdb
+    # pdb.set_trace()
     if rho_tm.ndim == 2:
         nvar = 1
     else:
         nvar = rho_tm.shape[1]
-
-    exc_eff = vxc_eff = fxc_eff = 0
+    exc_eff = vxc_eff = fxc_eff = kxc_eff = 0
     for p0, p1 in _prange(0, weights.size, blksize):
         nsg = p1 - p0
         p_sgrids = sgrids[p0:p1]
         p_weights = weights[p0:p1]
         rho = _project_spin_sph(rho_tm, p_sgrids)
+        
         xc_orig = func(rho, deriv+1)
 
         exc = xc_orig[0].reshape(ngrids, nsg)
@@ -249,6 +300,22 @@ def _eval_xc_lebedev(func, rho_tm, deriv, spin_samples,
             fxc += np.einsum('xbyczgo,xgo->byczgo', kxc[1], s)
             fxc = np.einsum('rao,axbygo->rxbygo', c_tm, fxc)
             fxc_eff += np.einsum('sbo,rxbygo->rxsyg', cw_tm, fxc)
+            
+        if deriv > 2:
+            lxc = xc_orig[4].reshape(2, nvar, 2, nvar, 2, nvar, 2, nvar, ngrids, nsg)
+            kxc[1,:,1,:,1] *= 4
+            kxc[1,:,1,:,0] *= 3
+            kxc[1,:,0,:,1] *= 3
+            kxc[0,:,1,:,1] *= 3
+            kxc[1,:,0,:,0] *= 2
+            kxc[0,:,1,:,0] *= 2
+            kxc[0,:,0,:,1] *= 2
+
+            kxc += np.einsum('wbxcydzgo,wgo->bxcydzgo', lxc[1], s)
+            kxc = np.einsum('rao,axbyczgo->rxbyczgo', c_tm, kxc)
+            kxc = np.einsum('sbo,rxbyczgo->rxsyczgo', c_tm, kxc)
+            # kxc = np.einsum('rao,sbo,axbyczgo->rxsyczgo', c_tm, c_tm,kxc)
+            kxc_eff += np.einsum('tco,rxsyczgo->rxsytzg', cw_tm, kxc)
 
     # exc in libxc is defined as Exc per particle. exc_eff calculated above is exc*rho.
     # Divide exc_eff by rho so as to follow the convention of libxc
@@ -272,6 +339,8 @@ def _eval_xc_lebedev(func, rho_tm, deriv, spin_samples,
                 vxc_eff[...,cs_idx] = xc_cs[1]
             if deriv > 1:
                 fxc_eff[...,cs_idx] = xc_cs[2]
+            if deriv > 2:
+                kxc_eff[...,cs_idx] = xc_cs[3]
 
     ret = [exc_eff]
     if deriv > 0:
@@ -279,6 +348,8 @@ def _eval_xc_lebedev(func, rho_tm, deriv, spin_samples,
     if deriv > 1:
         ret.append(fxc_eff)
     if deriv > 2:
+        ret.append(kxc_eff)
+    if deriv > 3:
         raise NotImplementedError
     return ret
 
@@ -335,6 +406,7 @@ def _project_spin_paxis(rho_tm, sgridz=None):
     '''Projects spins onto the principal axis'''
     rho = rho_tm[0]
     m = rho_tm[1:]
+    
     s = np.linalg.norm(m, axis=0)
     if sgridz is None:
         rho_ts = np.stack([rho, s])
@@ -347,9 +419,35 @@ def _project_spin_paxis(rho_tm, sgridz=None):
             rho_ts[1] = s[:,np.newaxis] * sgridz
             rho_ts = rho_ts.reshape(2, ngrids * nsg)
         else:
+            print('222')
             nvar = rho_tm.shape[1]
             rho_ts = np.empty((2, nvar, ngrids, nsg))
             rho_ts[0] = rho[:,:,np.newaxis]
             rho_ts[1] = s[:,:,np.newaxis] * sgridz
+            rho_ts = rho_ts.reshape(2, nvar, ngrids * nsg)
+    return rho_ts
+
+def _project_spin_paxis2(rho_tm, sgridz=None):
+    # ToDo: be written into the function _project_spin_paxis().
+    # Because use mz rather than |mz| here
+    '''Projects spins onto the principal axis'''
+    rho = rho_tm[0]
+    mz = rho_tm[1]
+    
+    if sgridz is None:
+        rho_ts = np.stack([rho, mz])
+    else:
+        ngrids = rho.shape[-1]
+        nsg = sgridz.shape[0]
+        if rho_tm.ndim == 2:
+            rho_ts = np.empty((2, ngrids, nsg))
+            rho_ts[0] = rho[:,np.newaxis]
+            rho_ts[1] = mz[:,np.newaxis] * sgridz
+            rho_ts = rho_ts.reshape(2, ngrids * nsg)
+        else:
+            nvar = rho_tm.shape[1]
+            rho_ts = np.empty((2, nvar, ngrids, nsg))
+            rho_ts[0] = rho[:,:,np.newaxis]
+            rho_ts[1] = mz[:,:,np.newaxis] * sgridz
             rho_ts = rho_ts.reshape(2, nvar, ngrids * nsg)
     return rho_ts

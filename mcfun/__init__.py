@@ -10,4 +10,4 @@ FilePath: \MCfun\mcfun\__init__.py
 '''
 __version__ = '0.2.2'
 
-from .eval_xc import eval_xc_eff, eval_xc_collinear_spin
+from .eval_xc import eval_xc_eff, eval_xc_collinear_spin, eval_xc_eff_sf
