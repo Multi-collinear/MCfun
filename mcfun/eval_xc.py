@@ -93,7 +93,7 @@ def eval_xc_eff(func, rho_tm, deriv=1, spin_samples=770,
                               spin_samples, collinear_threshold, collinear_samples)
                 futures.append(f)
             results = [f.result() for f in futures]
-        
+
     return [None if x[0] is None else np.concatenate(x, axis=-1) for x in zip(*results)]
 
 
@@ -123,7 +123,7 @@ def eval_xc_eff_sf(func, rho_tmz, deriv=1, collinear_samples=200, workers=1):
                 f = ex.submit(_eval_xc_sf, func, rho_tmz[...,p0:p1], deriv, collinear_samples)
                 futures.append(f)
             results = [f.result() for f in futures]
-        
+
     return [None if x[0] is None else np.concatenate(x, axis=-1) for x in zip(*results)]
 
 def _eval_xc_sf(func, rho_tmz, deriv, collinear_samples):
@@ -208,7 +208,7 @@ def eval_xc_collinear_spin(func, rho_tm, deriv, spin_samples):
     with np.errstate(divide='ignore', invalid='ignore'):
         omega = m[:,0] / s
     omega[:,s==0] = 0
-    
+
     xc_orig = func(rho_ts, deriv)
     exc_eff = xc_orig[0]
 
@@ -271,7 +271,7 @@ def _eval_xc_lebedev(func, rho_tm, deriv, spin_samples,
         p_sgrids = sgrids[p0:p1]
         p_weights = weights[p0:p1]
         rho = _project_spin_sph(rho_tm, p_sgrids)
-        
+
         xc_orig = func(rho, deriv+1)
 
         exc = xc_orig[0].reshape(ngrids, nsg)
@@ -300,7 +300,7 @@ def _eval_xc_lebedev(func, rho_tm, deriv, spin_samples,
             fxc += np.einsum('xbyczgo,xgo->byczgo', kxc[1], s)
             fxc = np.einsum('rao,axbygo->rxbygo', c_tm, fxc)
             fxc_eff += np.einsum('sbo,rxbygo->rxsyg', cw_tm, fxc)
-            
+
         if deriv > 2:
             lxc = xc_orig[4].reshape(2, nvar, 2, nvar, 2, nvar, 2, nvar, ngrids, nsg)
             kxc[1,:,1,:,1] *= 4
@@ -406,7 +406,7 @@ def _project_spin_paxis(rho_tm, sgridz=None):
     '''Projects spins onto the principal axis'''
     rho = rho_tm[0]
     m = rho_tm[1:]
-    
+
     s = np.linalg.norm(m, axis=0)
     if sgridz is None:
         rho_ts = np.stack([rho, s])
@@ -433,7 +433,7 @@ def _project_spin_paxis2(rho_tm, sgridz=None):
     '''Projects spins onto the principal axis'''
     rho = rho_tm[0]
     mz = rho_tm[1]
-    
+
     if sgridz is None:
         rho_ts = np.stack([rho, mz])
     else:
