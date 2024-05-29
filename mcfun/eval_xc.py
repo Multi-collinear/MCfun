@@ -80,12 +80,12 @@ def eval_xc_eff(func, rho_tm, deriv=1, spin_samples=770,
                                  collinear_threshold, collinear_samples)
             results.append(r)
     else:
-        if getattr(func, '__closure__', None):
-            warnings.warn(f'Closure {func} cannot be parallelized by multiprocessing module. '
-                          'It is recommended to generate the function with functools.partial.')
-            executor = ThreadPoolExecutor
-        else:
+        try:
+            pickle.dumps(func)
             executor = ProcessPoolExecutor
+        except (TypeError, AttributeError, pickle.PicklingError):
+            executor = ThreadPoolExecutor
+
         with executor(max_workers=workers) as ex:
             futures = []
             for p0, p1 in _prange(0, ngrids, grids_per_task):
