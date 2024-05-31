@@ -80,11 +80,7 @@ def eval_xc_eff(func, rho_tm, deriv=1, spin_samples=770,
                                  collinear_threshold, collinear_samples)
             results.append(r)
     else:
-        try:
-            pickle.dumps(func)
-            executor = ProcessPoolExecutor
-        except (TypeError, AttributeError, pickle.PicklingError):
-            executor = ThreadPoolExecutor
+        executor = ThreadPoolExecutor
 
         with executor(max_workers=workers) as ex:
             futures = []
