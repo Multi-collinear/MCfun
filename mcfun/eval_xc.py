@@ -107,12 +107,8 @@ def eval_xc_eff_sf(func, rho_tmz, deriv=1, collinear_samples=200, workers=1):
             results.append(r)
     else:
         print(collinear_samples)
-        if getattr(func, '__closure__', None):
-            warnings.warn(f'Closure {func} cannot be parallelized by multiprocessing module. '
-                          'It is recommended to generate the function with functools.partial.')
-            executor = ThreadPoolExecutor
-        else:
-            executor = ProcessPoolExecutor
+        executor = ThreadPoolExecutor
+
         with executor(max_workers=workers) as ex:
             futures = []
             for p0, p1 in _prange(0, ngrids, grids_per_task):
