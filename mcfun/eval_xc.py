@@ -128,15 +128,20 @@ def _eval_xc_sf(func, rho_tmz, deriv, collinear_samples):
         nvar = 1
     else:
         nvar = rho_tmz.shape[1]
-    # spin-flip part
-    fxc_sf = 0.0
+    fxc_sf = np.zeros((nvar,nvar,ngrids))
+    kxc_sf = np.zeros((nvar,nvar,2,nvar,ngrids))
     for p0, p1 in _prange(0, weights.size, blksize):
         rho = _project_spin_paxis2(rho_tmz, sgridz[p0:p1])
-        fxc = func(rho, deriv)[2]
-        fxc = fxc.reshape(2, nvar, 2, nvar, ngrids, p1 - p0)
-        fxc_sf += fxc[1,:,1].dot(weights[p0:p1])
+        xc_orig = func(rho, deriv)
+        if deriv > 1:
+            fxc = xc_orig[2].reshape(2, nvar, 2, nvar, ngrids, p1-p0)
+            fxc_sf += fxc[1,:,1].dot(weights[p0:p1])
 
-    return None,None,fxc_sf
+        if deriv > 2:
+            kxc = xc_orig[3].reshape(2, nvar, 2, nvar, 2, nvar, ngrids, p1-p0)
+            kxc_sf[:,:,0] += kxc[1,:,1,:,0].dot(weights[p0:p1])
+            kxc_sf[:,:,1] += kxc[1,:,1,:,1].dot(weights[p0:p1]*sgridz[p0:p1])
+    return None,None,fxc_sf,kxc_sf
 
 def eval_xc_collinear_spin(func, rho_tm, deriv, spin_samples):
     '''Multi-collinear functional derivatives for collinear spins
