@@ -17,7 +17,7 @@ jobs:
             python3 setup.py sdist
       - name: Upload to PyPI
         run: |
-            pip3 install twine
+            pip3 install twine==5.1.1
             export TWINE_USERNAME=__token__
             export TWINE_PASSWORD="${{ secrets.PYPI_API_TOKEN }}"
             twine upload --verbose dist/*
