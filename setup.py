@@ -26,6 +26,6 @@ setup(
     package_data={'': ['*.so', '*.dylib', '*.dll', '*.dat', '*.npy']},
     include_package_data=True,  # include everything in source control
     packages=find_packages(exclude=['*test*', '*examples*']),
-    install_requires=['numpy', 'typing', 'nptyping'],
+    install_requires=['numpy'],
     #extras_require=EXTRAS,
 )
