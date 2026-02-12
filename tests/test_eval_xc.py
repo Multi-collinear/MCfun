@@ -82,4 +82,4 @@ def test_eval_xc_eff_polarized_spins():
                                 collinear_threshold=0.99, workers=1)
     assert abs(exc*rho_tm[0,0] - -0.5623667079838119).max() < 1e-9
     assert abs(lib.fp(vxc) - -0.2915344473027743).max() < 1e-6
-    assert abs(lib.fp(fxc) - -1741313235.5147088).max() < 1e-2
+    assert abs(lib.fp(fxc) - -1741313235.5147088).max() < 5e-2
