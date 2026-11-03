@@ -18,6 +18,7 @@ def eval_xc_eff(func, rho_tm, deriv=1, spin_samples=770, workers=1):
     Parameters
     ----------
     func : Function to evaluate collinear functionals.
+        The collinear energy must be invariant under exchange of the two spin channels.
         The function signature is
             exc, vxc, fxc, ... = func((rho, s), deriv)
         The input rho and s have shape
@@ -49,7 +50,8 @@ def eval_xc_eff(func, rho_tm, deriv=1, spin_samples=770, workers=1):
     deriv : int, optional
         Functional derivatives. The current version (the kernel) supports maximum value 2.
     spin_samples : int, optional
-        Number of grid points on spherical surface
+        Number of points in the full Lebedev grid. Only one direction from
+        each antipodal pair is evaluated.
     workers : int, optional
         Parallel execution if workers > 1
 
@@ -222,10 +224,12 @@ def _eval_xc_lebedev(func, rho_tm, deriv, spin_samples):
     return ret
 
 def _make_sph_samples(spin_samples):
-    '''Integration samples on spherical surface'''
+    '''One direction per antipodal Lebedev pair, with the combined weight.'''
     ang_grids = MakeAngularGrid(spin_samples)
-    directions = ang_grids[:,:3].copy(order='F')
-    weights = ang_grids[:,3].copy()
+    x, y, z = ang_grids[:,:3].T
+    keep = (z > 0) | ((z == 0) & ((y > 0) | ((y == 0) & (x > 0))))
+    directions = np.asfortranarray(ang_grids[keep,:3])
+    weights = 2 * ang_grids[keep,3]
     return directions, weights
 
 def _prange(start, end, step):
