@@ -1,7 +1,7 @@
 import os
 from setuptools import setup, find_packages
 
-NAME            = 'MCfun'
+NAME            = 'mcfun'
 MAINTAINERS     = 'Zhichen Pu(hoshishin), Hao Li(Haskiy)'
 AUTHOR          = 'Yunlong Xiao, Zhichen Pu(hoshishin), Hao Li(Haskiy)'
 DESCRIPTION     = 'A library to calculate multi-collinear functionl'
