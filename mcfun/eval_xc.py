@@ -12,13 +12,13 @@ from .LebedevGrid import MakeAngularGrid
 
 MAX_GRIDS_PER_TASK = 200
 
-def eval_xc_eff(func, rho_tm, deriv=1, spin_samples=770,
-                collinear_threshold=None, collinear_samples=200, workers=1):
+def eval_xc_eff(func, rho_tm, deriv=1, spin_samples=770, workers=1):
     '''Multi-collinear effective potential and effective kernel.
 
     Parameters
     ----------
     func : Function to evaluate collinear functionals.
+        The collinear energy must be invariant under exchange of the two spin channels.
         The function signature is
             exc, vxc, fxc, ... = func((rho, s), deriv)
         The input rho and s have shape
@@ -50,14 +50,10 @@ def eval_xc_eff(func, rho_tm, deriv=1, spin_samples=770,
     deriv : int, optional
         Functional derivatives. The current version (the kernel) supports maximum value 2.
     spin_samples : int, optional
-        Number of grid points on spherical surface
+        Number of points in the full Lebedev grid. Only one direction from
+        each antipodal pair is evaluated.
     workers : int, optional
         Parallel execution if workers > 1
-    collinear_threshold : float, optional
-        if specified, filters the points of strongly polarized spins and calls the
-        eval_xc_collinear_spin for these points. Recommended value 0.99.
-    collinear_samples : int, optional
-        Number of samples for eval_xc_collinear_spin.
 
     Returns
     -------
@@ -76,8 +72,7 @@ def eval_xc_eff(func, rho_tm, deriv=1, spin_samples=770,
     if workers == 1:
         results = []
         for p0, p1 in _prange(0, ngrids, grids_per_task):
-            r = _eval_xc_lebedev(func, rho_tm[...,p0:p1], deriv, spin_samples,
-                                 collinear_threshold, collinear_samples)
+            r = _eval_xc_lebedev(func, rho_tm[...,p0:p1], deriv, spin_samples)
             results.append(r)
     else:
         executor = ThreadPoolExecutor
@@ -86,7 +81,7 @@ def eval_xc_eff(func, rho_tm, deriv=1, spin_samples=770,
             futures = []
             for p0, p1 in _prange(0, ngrids, grids_per_task):
                 f = ex.submit(_eval_xc_lebedev, func, rho_tm[...,p0:p1], deriv,
-                              spin_samples, collinear_threshold, collinear_samples)
+                              spin_samples)
                 futures.append(f)
             results = [f.result() for f in futures]
 
@@ -142,113 +137,7 @@ def _eval_xc_sf(func, rho_tmz, deriv, collinear_samples):
             kxc_sf[:,:,1] += kxc[1,:,1,:,1].dot(weights[p0:p1]*sgridz[p0:p1])
     return None,None,fxc_sf,kxc_sf
 
-def eval_xc_collinear_spin(func, rho_tm, deriv, spin_samples):
-    '''Multi-collinear functional derivatives for collinear spins
-
-    Parameters
-    ----------
-    func : Function to evaluate collinear functionals.
-        The function signature is
-            exc, vxc, fxc, ... = func((rho, s), deriv)
-        The input rho and s have shape
-        * (1, Ngrids) for LDA functionals
-        * (4, Ngrids) for GGA functionals where the four variables are
-        rho, nabla_x(rho), nabla_y(rho), nabla_z(rho)
-        * (5, Ngrids) for meta-GGA functionals where the five variables are
-        rho, nabla_x(rho), nabla_y(rho), nabla_z(rho), tau
-        The returns of func should have the shape
-        * (2, Nvar, Ngrids) for vxc
-        * (2, Nvar, 2, Nvar, Ngrids) for fxc
-        * (2, Nvar, 2, Nvar, 2, Nvar, Ngrids) for kxc
-        The dimension Nvar can be
-        * 1 for LDA
-        * 4 for GGA: rho, nabla_x(rho), nabla_y(rho), nabla_z(rho)
-        * 5 for meta-GGA: rho, nabla_x(rho), nabla_y(rho), nabla_z(rho), tau
-        Note: for GGA functionals the required returns have different conventions
-        to the returns of libxc or xcfun in functional derivatives. Here func
-        needs to return the derivatives to rho, nabla_x(rho), nabla_y(rho),
-        nabla_z(rho) while libxc (or xcfun) returns derivatives to rho, sigma_uu,
-        sigma_ud, sigma_dd (sigma_ud = nabla(rho_u) dot nabla(rho_d)).
-    rho_tm : np array with shape (4, Nvar, Ngrids)
-        rho_tm[0] is density. rho_tm[1:4] is the magnetization spin vector. Nvar can be
-        * 1 for LDA functionals
-        * 4 for GGA functionals: rho, nabla_x(rho), nabla_y(rho), nabla_z(rho)
-        * 5 for meta-GGA functionals: rho, nabla_x(rho), nabla_y(rho), nabla_z(rho), tau
-    deriv : int, optional
-        Functional derivatives. The current version (the kernel) supports maximum value 2.
-    spin_samples : int, optional
-        Number of grid points on principal axis
-
-    Returns
-    -------
-    XC functional and derivatives for each grid.
-    * [exc] if deriv = 0
-    * [exc, vxc] if deriv = 1
-    * [exc, vxc, fxc] if deriv = 2
-    '''
-    ngrids = rho_tm.shape[-1]
-    # samples on z=cos(theta) and their weights between [0, 1]
-    sgridz, weights = _make_paxis_samples(spin_samples)
-    blksize = int(np.ceil(1e5 / ngrids)) * 8
-
-    if rho_tm.ndim == 2:
-        nvar = 1
-    else:
-        nvar = rho_tm.shape[1]
-
-    rho_ts = _project_spin_paxis(rho_tm)
-
-    # TODO: filter s, nabla(s) ~= 0
-    m = rho_tm[1:].reshape(3, nvar, ngrids)
-    s = rho_ts[1].reshape(nvar, ngrids)[0]
-    with np.errstate(divide='ignore', invalid='ignore'):
-        omega = m[:,0] / s
-    omega[:,s==0] = 0
-
-    xc_orig = func(rho_ts, deriv)
-    exc_eff = xc_orig[0]
-
-    omega = omega.reshape(3, ngrids)
-    if deriv > 0:
-        vxc = xc_orig[1].reshape(2, nvar, ngrids)
-        vxc_eff = np.vstack((vxc[:1], np.einsum('xg,rg->rxg', vxc[1], omega)))
-
-    if deriv > 1:
-        # spin-conserve part
-        fxc = xc_orig[2].reshape(2, nvar, 2, nvar, ngrids)
-        fxc_eff = np.empty((4, nvar, 4, nvar, ngrids))
-        fxc_eff[0,:,0] = fxc[0,:,0]
-        fz1 = np.einsum('xyg,rg->rxyg', fxc[1,:,0], omega)
-        fxc_eff[1:,:,0 ] = fz1
-        fxc_eff[0 ,:,1:] = fz1.transpose(1,0,2,3)
-        tmp = np.einsum('xyg,rg->rxyg', fxc[1,:,1,:], omega)
-        fxc_eff[1:,:,1:] = np.einsum('rxyg,sg->rxsyg', tmp, omega)
-
-        # spin-flip part
-        fxc_sf = 0
-        for p0, p1 in _prange(0, weights.size, blksize):
-            rho = _project_spin_paxis(rho_tm, sgridz[p0:p1])
-            fxc = func(rho, deriv)[2]
-            fxc = fxc.reshape(2, nvar, 2, nvar, ngrids, p1 - p0)
-            # only considers the xx+yy part
-            fxc_sf += fxc[1,:,1].dot(weights[p0:p1])
-
-        for i in range(1, 4):
-            fxc_eff[i,:,i] += fxc_sf
-        tmp = np.einsum('xyg,rg->rxyg', fxc_sf, omega)
-        fxc_eff[1:,:,1:] -= np.einsum('rxyg,sg->rxsyg', tmp, omega)
-
-    ret = [exc_eff]
-    if deriv > 0:
-        ret.append(vxc_eff)
-    if deriv > 1:
-        ret.append(fxc_eff)
-    if deriv > 2:
-        raise NotImplementedError
-    return ret
-
-def _eval_xc_lebedev(func, rho_tm, deriv, spin_samples,
-                     collinear_threshold=None, collinear_samples=200):
+def _eval_xc_lebedev(func, rho_tm, deriv, spin_samples):
     '''Multi-collinear effective potential and effective kernel with projection
     samples on spherical surface (the Lebedev grid samples)
     '''
@@ -323,21 +212,6 @@ def _eval_xc_lebedev(func, rho_tm, deriv, spin_samples,
     exc_eff[rho_pure == 0] = 0
     exc_eff[rho_pure != 0] /= rho_pure[rho_pure != 0]
 
-    # Strongly spin-polarized points (rho ~= |m|) can be considered as collinear spins
-    if collinear_threshold is not None:
-        rho, s = _project_spin_paxis(rho_tm.reshape(4, nvar, ngrids)[:,0])
-        cs_idx = np.where(s >= rho * collinear_threshold)[0]
-        if cs_idx.size > 0:
-            xc_cs = eval_xc_collinear_spin(func, rho_tm[...,cs_idx], deriv,
-                                           collinear_samples)
-            exc_eff[...,cs_idx] = xc_cs[0]
-            if deriv > 0:
-                vxc_eff[...,cs_idx] = xc_cs[1]
-            if deriv > 1:
-                fxc_eff[...,cs_idx] = xc_cs[2]
-            if deriv > 2:
-                kxc_eff[...,cs_idx] = xc_cs[3]
-
     ret = [exc_eff]
     if deriv > 0:
         ret.append(vxc_eff)
@@ -350,10 +224,12 @@ def _eval_xc_lebedev(func, rho_tm, deriv, spin_samples,
     return ret
 
 def _make_sph_samples(spin_samples):
-    '''Integration samples on spherical surface'''
+    '''One direction per antipodal Lebedev pair, with the combined weight.'''
     ang_grids = MakeAngularGrid(spin_samples)
-    directions = ang_grids[:,:3].copy(order='F')
-    weights = ang_grids[:,3].copy()
+    x, y, z = ang_grids[:,:3].T
+    keep = (z > 0) | ((z == 0) & ((y > 0) | ((y == 0) & (x > 0))))
+    directions = np.asfortranarray(ang_grids[keep,:3])
+    weights = 2 * ang_grids[keep,3]
     return directions, weights
 
 def _prange(start, end, step):
@@ -398,34 +274,8 @@ def _make_paxis_samples(spin_samples):
     wt *= .5  # normalized to 1
     return rt, wt
 
-def _project_spin_paxis(rho_tm, sgridz=None):
-    '''Projects spins onto the principal axis'''
-    rho = rho_tm[0]
-    m = rho_tm[1:]
-
-    s = np.linalg.norm(m, axis=0)
-    if sgridz is None:
-        rho_ts = np.stack([rho, s])
-    else:
-        ngrids = rho.shape[-1]
-        nsg = sgridz.shape[0]
-        if rho_tm.ndim == 2:
-            rho_ts = np.empty((2, ngrids, nsg))
-            rho_ts[0] = rho[:,np.newaxis]
-            rho_ts[1] = s[:,np.newaxis] * sgridz
-            rho_ts = rho_ts.reshape(2, ngrids * nsg)
-        else:
-            nvar = rho_tm.shape[1]
-            rho_ts = np.empty((2, nvar, ngrids, nsg))
-            rho_ts[0] = rho[:,:,np.newaxis]
-            rho_ts[1] = s[:,:,np.newaxis] * sgridz
-            rho_ts = rho_ts.reshape(2, nvar, ngrids * nsg)
-    return rho_ts
-
 def _project_spin_paxis2(rho_tm, sgridz=None):
-    # ToDo: be written into the function _project_spin_paxis().
-    # Because use mz rather than |mz| here
-    '''Projects spins onto the principal axis'''
+    '''Scales signed collinear spin variables by the polar-axis samples.'''
     rho = rho_tm[0]
     mz = rho_tm[1]
 
