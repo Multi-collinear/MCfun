@@ -12,7 +12,8 @@ from .LebedevGrid import MakeAngularGrid
 
 MAX_GRIDS_PER_TASK = 200
 
-def eval_xc_eff(func, rho_tm, deriv=1, spin_samples=770, workers=1):
+def eval_xc_eff(func, rho_tm, deriv=1, spin_samples=770, workers=1,
+                block_size=MAX_GRIDS_PER_TASK):
     '''Multi-collinear effective potential and effective kernel.
 
     Parameters
@@ -54,6 +55,9 @@ def eval_xc_eff(func, rho_tm, deriv=1, spin_samples=770, workers=1):
         each antipodal pair is evaluated.
     workers : int, optional
         Parallel execution if workers > 1
+    block_size : int, optional
+        Maximum number of spatial grid points per task. Smaller values reduce
+        peak worker memory. Defaults to MAX_GRIDS_PER_TASK (200).
 
     Returns
     -------
@@ -68,7 +72,7 @@ def eval_xc_eff(func, rho_tm, deriv=1, spin_samples=770, workers=1):
     if rho_tm.dtype != np.double:
         raise RuntimeError('rho and m must be real')
     ngrids = rho_tm.shape[-1]
-    grids_per_task = min(ngrids//(workers*3)+1, MAX_GRIDS_PER_TASK)
+    grids_per_task = min(ngrids//(workers*3)+1, block_size)
     if workers == 1:
         results = []
         for p0, p1 in _prange(0, ngrids, grids_per_task):
@@ -88,12 +92,13 @@ def eval_xc_eff(func, rho_tm, deriv=1, spin_samples=770, workers=1):
     return [None if x[0] is None else np.concatenate(x, axis=-1) for x in zip(*results)]
 
 
-def eval_xc_eff_sf(func, rho_tmz, deriv=1, collinear_samples=200, workers=1):
+def eval_xc_eff_sf(func, rho_tmz, deriv=1, collinear_samples=200, workers=1,
+                   block_size=MAX_GRIDS_PER_TASK):
     assert deriv < 5
     if rho_tmz.dtype != np.double:
         raise RuntimeError('rho and mz must be real')
     ngrids = rho_tmz.shape[-1]
-    grids_per_task = min(ngrids//(workers*3)+1, MAX_GRIDS_PER_TASK)
+    grids_per_task = min(ngrids//(workers*3)+1, block_size)
 
     if workers == 1:
         results = []
